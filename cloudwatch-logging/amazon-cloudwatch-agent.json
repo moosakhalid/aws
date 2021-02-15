@@ -78,13 +78,9 @@
     "append_dimensions": {
       "ImageId": "${aws:ImageId}",
       "InstanceId": "${aws:InstanceId}",
-      "InstanceType": "${aws:InstanceType}",
-      "AutoScalingGroupName": "${aws:AutoScalingGroupName}"
+      "InstanceType": "${aws:InstanceType}"
     },
     "aggregation_dimensions": [
-      [
-        "AutoScalingGroupName"
-      ],
       [
         "InstanceId",
         "InstanceType"
