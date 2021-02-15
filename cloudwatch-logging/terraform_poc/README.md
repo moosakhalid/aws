@@ -38,3 +38,9 @@
 templatefile("amazon-cloudwatch-agent.tpl", {region = "us-east-1"})
 
 to escapte ${ in json use $${ in template file being rendered
+
+
+
+## Ideas for later
+1. Auto plug in your local machines public IP into SG's SSH ingress rule.
+2. Auto generate SSH Keypairs using Terraform built-in functions.
