@@ -2,9 +2,6 @@ provider "aws" {
   region = var.region
 }
 
-resource "null_resource" "get_my_ip" {
-
-}
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
 
