@@ -1,0 +1,13 @@
+#!/bin/bash
+yum -y install mariadb-server
+sleep 2
+systemctl start mariadb
+sleep 2
+mysqladmin -uroot password '${password}'
+mysql -uroot -p${password} -e "CREATE USER 'dms'@'%' IDENTIFIED BY '${password}';"
+mysql -uroot -p${password} -e "GRANT ALL PRIVILEGES ON *.* TO 'dms'@'%' WITH GRANT OPTION;FLUSH PRIVILEGES;"
+wget -c https://downloads.mysql.com/docs/sakila-db.tar.gz
+tar -xvzf sakila-db.tar.gz -C /home/ec2-user/
+mysql -uroot -p${password} -e "source /home/ec2-user/sakila-db/sakila-schema.sql;"
+mysql -uroot -p${password} -e "source /home/ec2-user/sakila-db/sakila-data.sql;"
+
