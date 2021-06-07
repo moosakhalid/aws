@@ -1,5 +1,6 @@
 # Instructions
 
+
 ## DMS = Database Migration Service(AWS)
 
 1) Creates an EC2 instance and bootstraps MariaDB on it and also makes a new user for DMS replication instance to use. 
@@ -16,6 +17,8 @@
 6) DMS replication instance
 
 7) DMS replication task
+
+### Note: By default the Terraform Deployment will look for AWS CLI profile 'linuxacademy-test' a profile that I used while testing, change it in the main.tf file under aws provider to map to your AWS CLI profile. Cheers!
 
 It will create all resources in the us-east-1 region for simplicity but ideally since we'll be using Public IP to connect to EC2 MySQL, it could be hosted anywhere as long as it's accessible over the internet/VPN etc.
 
