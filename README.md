@@ -1,3 +1,3 @@
 # aws
 
-Various projects using Python to interact with AWS.
+Projects using AWS and various technologies/languages.
