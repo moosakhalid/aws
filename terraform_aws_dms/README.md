@@ -1,7 +1,23 @@
 # Instructions
 
+#Pre-req steps:
+```
+aws configure --profile linuxacademy-test #create AWS profile with your AWS account creds, you can change the embedded profile name if you like
+ssh-keygen -t rsa #go through the interactive prompt, do this only if the ~/.ssh/id_rsa file doesn't exist on your system
+```
+## Usage
+```
+git clone https://github.com/moosakhalid/aws.git
+cd aws/terraform_aws_dms
+terraform init
+terraform validate
+terraform plan -var external_ip=$(curl -s ifconfig.me)/32
+terraform apply -var external_ip=$(curl -s ifconfig.me)/32
+#When you're done
+terraform destroy -var external_ip=$(curl -s ifconfig.me)/32
+```
 
-## DMS = Database Migration Service(AWS)
+## DMS = Database Migration Service(AWS) - What the Terraform code does
 
 1) Creates an EC2 instance and bootstraps MariaDB on it and also makes a new user for DMS replication instance to use. 
    A sample DB known as Sakila DB is also downloaded and ingested into MariaDB.
