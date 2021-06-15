@@ -10,4 +10,3 @@ wget -c https://downloads.mysql.com/docs/sakila-db.tar.gz
 tar -xvzf sakila-db.tar.gz -C /home/ec2-user/
 mysql -uroot -p${password} -e "source /home/ec2-user/sakila-db/sakila-schema.sql;"
 mysql -uroot -p${password} -e "source /home/ec2-user/sakila-db/sakila-data.sql;"
-

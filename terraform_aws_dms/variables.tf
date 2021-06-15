@@ -1,3 +1,8 @@
+variable "aws_profile" {
+  type    = string
+  default = "default"
+}
+
 variable "password" {
   description = "password to set for both databases - source & target, ideally should be fetched via Vault"
   type        = string

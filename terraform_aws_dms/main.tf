@@ -4,7 +4,7 @@ terraform {
 
 provider "aws" {
   region  = "us-east-1"
-  profile = "linuxacademy-test"
+  profile = var.aws_profile
 }
 
 data "template_file" "user_data_ec2" {
