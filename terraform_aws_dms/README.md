@@ -61,13 +61,13 @@ terraform validate
 
 ## Step 5: Get your public IP
 
-This module restricts SSH access to the EC2 source instance using your public IP.
+This module restricts SSH access to the EC2 source instance using your public IPv4 address.
 
 ```bash
-curl -s ifconfig.me
+curl -4 -s ifconfig.me
 ```
 
-If the command returns an IPv4 address, use `/32`.
+Use the returned value as `<YOUR_PUBLIC_IPV4>/32`.
 
 Example:
 
@@ -75,26 +75,10 @@ Example:
 203.0.113.10/32
 ```
 
-If the command returns an IPv6 address, use `/128`.
-
-Example:
-
-```bash
-2001:db8::1234/128
-```
-
 ## Step 6: Review the plan
 
-For IPv4:
-
 ```bash
-terraform plan -var="external_ip=$(curl -s ifconfig.me)/32"
-```
-
-For IPv6:
-
-```bash
-terraform plan -var="external_ip=$(curl -s ifconfig.me)/128"
+terraform plan -var="external_ip=$(curl -4 -s ifconfig.me)/32"
 ```
 
 With a custom AWS profile:
@@ -102,21 +86,13 @@ With a custom AWS profile:
 ```bash
 terraform plan \
   -var="aws_profile=YOUR_PROFILE_NAME" \
-  -var="external_ip=YOUR_PUBLIC_IP_CIDR"
+  -var="external_ip=$(curl -4 -s ifconfig.me)/32"
 ```
 
 ## Step 7: Apply the infrastructure
 
-For IPv4:
-
 ```bash
-terraform apply -var="external_ip=$(curl -s ifconfig.me)/32"
-```
-
-For IPv6:
-
-```bash
-terraform apply -var="external_ip=$(curl -s ifconfig.me)/128"
+terraform apply -var="external_ip=$(curl -4 -s ifconfig.me)/32"
 ```
 
 With a custom AWS profile:
@@ -124,7 +100,7 @@ With a custom AWS profile:
 ```bash
 terraform apply \
   -var="aws_profile=YOUR_PROFILE_NAME" \
-  -var="external_ip=YOUR_PUBLIC_IP_CIDR"
+  -var="external_ip=$(curl -4 -s ifconfig.me)/32"
 ```
 
 Type `yes` when prompted.
@@ -171,16 +147,8 @@ Then check the replication task status. If it does not start automatically, sele
 
 When you are done, destroy everything:
 
-For IPv4:
-
 ```bash
-terraform destroy -var="external_ip=$(curl -s ifconfig.me)/32"
-```
-
-For IPv6:
-
-```bash
-terraform destroy -var="external_ip=$(curl -s ifconfig.me)/128"
+terraform destroy -var="external_ip=$(curl -4 -s ifconfig.me)/32"
 ```
 
 With a custom AWS profile:
@@ -188,7 +156,7 @@ With a custom AWS profile:
 ```bash
 terraform destroy \
   -var="aws_profile=YOUR_PROFILE_NAME" \
-  -var="external_ip=YOUR_PUBLIC_IP_CIDR"
+  -var="external_ip=$(curl -4 -s ifconfig.me)/32"
 ```
 
 ## Notes
@@ -199,3 +167,61 @@ terraform destroy \
 - The default SSH public key path is `~/.ssh/id_rsa.pub`
 - The database password is currently provided via a Terraform variable and should be treated as demo-only
 - DMS, RDS, and EC2 resources can take several minutes to become ready
+
+## Instance Type Notes
+
+AWS instance offerings can change over time by region and Availability Zone. If `terraform apply` fails because an EC2 or DMS instance class is unavailable, update the value in the Terraform code and try again.
+
+Current locations in this module:
+- EC2 source instance type: `main.tf`
+- DMS replication instance class: `dms.tf`
+
+### EC2 instance type
+
+If the EC2 instance fails with an error such as "instance type is not supported in your requested Availability Zone", choose another small burstable instance type and update `main.tf`.
+
+Examples:
+- `t3.micro`
+- `t3a.micro`
+- `t2.micro`
+
+To check which EC2 instance types are offered in a specific Availability Zone:
+
+```bash
+aws ec2 describe-instance-type-offerings \
+  --location-type availability-zone \
+  --filters Name=location,Values=us-east-1a
+```
+
+To check offerings across the region:
+
+```bash
+aws ec2 describe-instance-type-offerings \
+  --location-type region \
+  --filters Name=location,Values=us-east-1
+```
+
+You can narrow the output to small burstable families if needed:
+
+```bash
+aws ec2 describe-instance-type-offerings \
+  --location-type region \
+  --filters Name=location,Values=us-east-1 \
+            Name=instance-type,Values=t2.micro,t3.micro,t3a.micro
+```
+
+### DMS replication instance class
+
+If DMS replication instance creation fails because the class is unavailable or no longer supported, update the replication instance class in `dms.tf`.
+
+Examples of DMS classes you may need to use instead:
+- `dms.t3.small`
+- `dms.c5.large`
+
+AWS DMS supported replication instance classes can change over time, so check the current AWS documentation if a class stops working.
+
+### Practical advice
+
+- Treat instance sizes in this repo as working defaults, not permanent values
+- If AWS rejects an instance type or class, replace it with a currently supported one and rerun `terraform plan` and `terraform apply`
+- Availability can differ by account, region, and Availability Zone
