@@ -41,11 +41,7 @@ resource "aws_dms_replication_instance" "dms-instance" {
     aws_security_group.security_group_dms.id
   ]
   depends_on = [
-    aws_iam_role.dms-vpc-role,
-    aws_iam_role_policy_attachment.dms-vpc-role-AmazonDMSVPCManagementRole,
-    aws_iam_role_policy.dms-vpc-role-policy,
-    aws_iam_role.dms-cloudwatch-logs-role,
-    aws_iam_role_policy_attachment.dms-cloudwatch-logs-role-AmazonDMSCloudWatchLogsRole,
+    time_sleep.dms_iam_propagation,
   ]
 }
 

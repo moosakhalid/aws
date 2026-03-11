@@ -122,6 +122,7 @@ Important outputs:
 Note:
 - The source EC2 host runs MariaDB and is initialized with a `root` password from `var.password`
 - A separate MySQL user named `dms` is also created for the DMS source endpoint
+- The source EC2 host also installs a MySQL Community client so you can connect from that box to MySQL 8.x RDS instances that use `caching_sha2_password`
 - The same Terraform variable `password` is used for both the source and target databases unless you override it
 
 ## Step 9: Connect to the source EC2 instance
@@ -132,7 +133,29 @@ Use the `Source-MySQL-IP` output value:
 ssh -i ~/.ssh/id_rsa ec2-user@<SOURCE_MYSQL_IP>
 ```
 
-## Step 10: Check the AWS DMS Console
+## Step 10: Verify the source Sakila database on the EC2 instance
+
+From the EC2 host, connect to the local MariaDB server and confirm the Sakila schema was loaded:
+
+```bash
+mysql -uroot -p
+```
+
+Then run:
+
+```sql
+SHOW DATABASES LIKE 'sakila';
+USE sakila;
+SHOW TABLES;
+SELECT COUNT(*) AS actor_count FROM actor;
+```
+
+Expected result:
+- The `sakila` database exists
+- The schema contains many tables such as `actor`, `film`, and `customer`
+- Queries return rows successfully
+
+## Step 11: Check the AWS DMS Console
 
 After the infrastructure is created, open the AWS DMS console and confirm these resources exist:
 
@@ -142,6 +165,43 @@ After the infrastructure is created, open the AWS DMS console and confirm these 
 - Replication task: `replication-task-dms`
 
 Then check the replication task status. If it does not start automatically, select `replication-task-dms` and resume or restart it from the console.
+
+Wait until the replication task reaches a completed or load-finished state before verifying data on the target RDS instance.
+
+## Step 12: From the same EC2 instance, connect to the target RDS instance and verify Sakila was migrated
+
+This EC2 instance can connect to the RDS instance on port `3306` because both resources use the same security group, and that security group allows MySQL traffic from itself. In Terraform, see:
+- [main.tf](/Users/moosakhalid/aws/terraform_aws_dms/main.tf#L72)
+- [main.tf](/Users/moosakhalid/aws/terraform_aws_dms/main.tf#L105)
+- [main.tf](/Users/moosakhalid/aws/terraform_aws_dms/main.tf#L122)
+
+From the EC2 host, use the installed MySQL Community client to connect to RDS:
+
+```bash
+mysql -h <RDS_ENDPOINT_HOSTNAME> -u admin -p
+```
+
+You can get the hostname from:
+
+```bash
+terraform output RDS-Endpoint-Hostname
+```
+
+After connecting, run:
+
+```sql
+SHOW DATABASES;
+USE sakila;
+SHOW TABLES;
+SELECT COUNT(*) AS actor_count FROM actor;
+```
+
+Expected result after DMS finishes:
+- The `sakila` schema exists on the target RDS instance
+- The Sakila tables are present
+- Row counts such as `actor_count` match the source closely or exactly, depending on task timing
+
+If `sakila` is not yet present on RDS, recheck the DMS task status and endpoint health in the AWS DMS console.
 
 ## Clean up
 
@@ -167,6 +227,7 @@ terraform destroy \
 - The default SSH public key path is `~/.ssh/id_rsa.pub`
 - The database password is currently provided via a Terraform variable and should be treated as demo-only
 - DMS, RDS, and EC2 resources can take several minutes to become ready
+- IAM propagation for the DMS service roles is delayed explicitly before the replication instance is created, because Terraform `depends_on` alone does not wait for AWS IAM eventual consistency
 
 ## Instance Type Notes
 

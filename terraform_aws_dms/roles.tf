@@ -32,9 +32,6 @@ resource "aws_iam_role_policy_attachment" "dms-cloudwatch-logs-role-AmazonDMSClo
 resource "aws_iam_role" "dms-vpc-role" {
   assume_role_policy = data.aws_iam_policy_document.dms_assume_role.json
   name               = "dms-vpc-role"
-  provisioner "local-exec" {
-    command = "sleep 80"
-  }
 }
 
 resource "aws_iam_role_policy_attachment" "dms-vpc-role-AmazonDMSVPCManagementRole" {
@@ -46,4 +43,18 @@ resource "aws_iam_role_policy" "dms-vpc-role-policy" {
   name   = "dms-vpc-role-policy"
   role   = aws_iam_role.dms-vpc-role.id
   policy = file("dms_policy.json")
+}
+
+# DMS creation can race IAM eventual consistency even when Terraform ordering is correct.
+# Wait until the roles and all attached policies have had time to propagate before creating the instance.
+resource "time_sleep" "dms_iam_propagation" {
+  create_duration = "90s"
+
+  depends_on = [
+    aws_iam_role.dms-vpc-role,
+    aws_iam_role_policy_attachment.dms-vpc-role-AmazonDMSVPCManagementRole,
+    aws_iam_role_policy.dms-vpc-role-policy,
+    aws_iam_role.dms-cloudwatch-logs-role,
+    aws_iam_role_policy_attachment.dms-cloudwatch-logs-role-AmazonDMSCloudWatchLogsRole,
+  ]
 }

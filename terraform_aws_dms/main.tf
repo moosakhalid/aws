@@ -8,6 +8,9 @@ terraform {
     http = {
       source = "hashicorp/http"
     }
+    time = {
+      source = "hashicorp/time"
+    }
   }
 }
 
