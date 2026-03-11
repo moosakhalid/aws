@@ -1,10 +1,27 @@
 terraform {
   required_version = ">=0.13.0"
+
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+    }
+    http = {
+      source = "hashicorp/http"
+    }
+  }
 }
 
 provider "aws" {
   region  = "us-east-1"
   profile = var.aws_profile
+}
+
+data "http" "public_ipv4" {
+  url = "https://checkip.amazonaws.com/"
+
+  request_headers = {
+    Accept = "text/plain"
+  }
 }
 
 locals {
@@ -14,6 +31,7 @@ locals {
   normalized_external_ip = local.external_ip_is_ipv6 && endswith(var.external_ip, "/32") ? "${local.external_ip_address}/128" : var.external_ip
   external_ipv4_cidr     = local.external_ip_is_ipv6 ? null : local.normalized_external_ip
   external_ipv6_cidr     = local.external_ip_is_ipv6 ? local.normalized_external_ip : null
+  laptop_ipv4_cidr       = "${trimspace(data.http.public_ipv4.response_body)}/32"
 }
 
 data "aws_vpc" "default_vpc" {
@@ -45,7 +63,7 @@ resource "aws_security_group" "security_group_dms" {
     from_port        = 22
     to_port          = 22
     protocol         = "tcp"
-    cidr_blocks      = local.external_ipv4_cidr == null ? [] : [local.external_ipv4_cidr]
+    cidr_blocks      = distinct(compact(concat([local.laptop_ipv4_cidr], local.external_ipv4_cidr == null ? [] : [local.external_ipv4_cidr])))
     ipv6_cidr_blocks = local.external_ipv6_cidr == null ? [] : [local.external_ipv6_cidr]
   }
   ingress {
@@ -78,7 +96,7 @@ resource "aws_security_group_rule" "add_dms_replication_ip_to_sg" {
 #Source MySQL Instance
 resource "aws_instance" "source_mysql" {
   ami                         = data.aws_ssm_parameter.amazon_linux2_ami.value
-  instance_type               = "t3.micro"
+  instance_type               = "t2.micro"
   key_name                    = aws_key_pair.source_mysql_key.key_name
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.security_group_dms.id]

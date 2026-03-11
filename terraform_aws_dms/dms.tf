@@ -30,7 +30,7 @@ resource "aws_dms_replication_instance" "dms-instance" {
   auto_minor_version_upgrade = false
   multi_az                   = false
   publicly_accessible        = true
-  replication_instance_class = "dms.t3.micro"
+  replication_instance_class = "dms.t3.small"
   replication_instance_id    = "dms-instance"
 
   tags = {
@@ -40,7 +40,13 @@ resource "aws_dms_replication_instance" "dms-instance" {
   vpc_security_group_ids = [
     aws_security_group.security_group_dms.id
   ]
-  depends_on = [aws_iam_role.dms-vpc-role]
+  depends_on = [
+    aws_iam_role.dms-vpc-role,
+    aws_iam_role_policy_attachment.dms-vpc-role-AmazonDMSVPCManagementRole,
+    aws_iam_role_policy.dms-vpc-role-policy,
+    aws_iam_role.dms-cloudwatch-logs-role,
+    aws_iam_role_policy_attachment.dms-cloudwatch-logs-role-AmazonDMSCloudWatchLogsRole,
+  ]
 }
 
 
