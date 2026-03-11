@@ -1,48 +1,201 @@
-# Instructions
+# Terraform AWS DMS Demo
 
-#Pre-req steps:
+This Terraform module creates a simple AWS Database Migration Service (DMS) demo environment in `us-east-1`.
+
+It provisions:
+- A source EC2 instance running MariaDB with the Sakila sample database loaded
+- A target MySQL RDS instance
+- A security group for SSH and MySQL traffic
+- IAM roles required by DMS
+- A DMS replication instance
+- DMS source and target endpoints
+- A DMS replication task
+
+## Prerequisites
+
+Make sure you have:
+
+1. Terraform installed
+2. AWS CLI installed
+3. An AWS account with permissions to create EC2, RDS, IAM, DMS, and security group resources
+4. An SSH key pair where the public key exists at `~/.ssh/id_rsa.pub`
+
+If you do not already have an SSH key pair, create one:
+
+```bash
+ssh-keygen -t rsa
 ```
-aws configure --profile linuxacademy-test #create AWS profile with your AWS account creds, you can change the embedded profile name if you like
-ssh-keygen -t rsa #go through the interactive prompt, do this only if the ~/.ssh/id_rsa file doesn't exist on your system
+
+This module reads the public key from `~/.ssh/id_rsa.pub` and you will use the matching private key `~/.ssh/id_rsa` to SSH into the EC2 instance.
+
+## Step 1: Configure your AWS profile
+
+This module uses the AWS CLI `default` profile unless you override it.
+
+To configure the default profile:
+
+```bash
+aws configure
 ```
-## Usage
-```
+
+If you want to use a different AWS profile, pass it explicitly during `plan`, `apply`, and `destroy`.
+
+## Step 2: Clone and enter the project
+
+```bash
 git clone https://github.com/moosakhalid/aws.git
 cd aws/terraform_aws_dms
-terraform init
-terraform validate
-terraform plan -var external_ip=$(curl -s ifconfig.me)/32
-terraform apply -var external_ip=$(curl -s ifconfig.me)/32
-#When you're done
-terraform destroy -var external_ip=$(curl -s ifconfig.me)/32
 ```
 
-## DMS = Database Migration Service(AWS) - What the Terraform code does
+## Step 3: Initialize Terraform
 
-1) Creates an EC2 instance and bootstraps MariaDB on it and also makes a new user for DMS replication instance to use. 
-   A sample DB known as Sakila DB is also downloaded and ingested into MariaDB.
+```bash
+terraform init
+```
 
-2) An RDS DB instance is created.
+## Step 4: Validate the configuration
 
-3) A Security Group to be attached to appropriate resources for MySQL traffic.
+```bash
+terraform validate
+```
 
-4) A replication source and target endpoint for DMS
+## Step 5: Get your public IP
 
-5) DMS roles
+This module restricts SSH access to the EC2 source instance using your public IP.
 
-6) DMS replication instance
+```bash
+curl -s ifconfig.me
+```
 
-7) DMS replication task
+If the command returns an IPv4 address, use `/32`.
 
-### Note: By default the Terraform Deployment will look for AWS CLI profile 'linuxacademy-test' a profile that I used while testing, change it in the main.tf file under aws provider to map to your AWS CLI profile. Cheers!
+Example:
 
-It will create all resources in the us-east-1 region for simplicity but ideally since we'll be using Public IP to connect to EC2 MySQL, it could be hosted anywhere as long as it's accessible over the internet/VPN etc.
+```bash
+203.0.113.10/32
+```
 
-It takes a little time to run as it's creating time consuming resources like EC2 and RDS and DMS replication instances but once it completes head over to the DMS dashboard, go to the Replication task and "Resume/Restart" it.
+If the command returns an IPv6 address, use `/128`.
 
-There are a couple of bugs associated with DMS resources in Terraform which I've tried to workaround but they may still hit during deployment:
+Example:
 
-1. https://github.com/hashicorp/terraform-provider-aws/issues/11025
-2. https://github.com/hashicorp/terraform-provider-aws/issues/7600
+```bash
+2001:db8::1234/128
+```
 
-## The Terraform template assumes that you have run the "ssh-keygen -t rsa" command OR that the "~/.ssh/id_rsa" file exists, if neither of this is true, Terraform execution will fail at either validation or plan.This is done so you can ssh into the EC2 MySQL instance, and from that EC2 MySQL instance you can even connect to the RDS instance.
+## Step 6: Review the plan
+
+For IPv4:
+
+```bash
+terraform plan -var="external_ip=$(curl -s ifconfig.me)/32"
+```
+
+For IPv6:
+
+```bash
+terraform plan -var="external_ip=$(curl -s ifconfig.me)/128"
+```
+
+With a custom AWS profile:
+
+```bash
+terraform plan \
+  -var="aws_profile=YOUR_PROFILE_NAME" \
+  -var="external_ip=YOUR_PUBLIC_IP_CIDR"
+```
+
+## Step 7: Apply the infrastructure
+
+For IPv4:
+
+```bash
+terraform apply -var="external_ip=$(curl -s ifconfig.me)/32"
+```
+
+For IPv6:
+
+```bash
+terraform apply -var="external_ip=$(curl -s ifconfig.me)/128"
+```
+
+With a custom AWS profile:
+
+```bash
+terraform apply \
+  -var="aws_profile=YOUR_PROFILE_NAME" \
+  -var="external_ip=YOUR_PUBLIC_IP_CIDR"
+```
+
+Type `yes` when prompted.
+
+## Step 8: Check Terraform outputs
+
+After apply completes, run:
+
+```bash
+terraform output
+```
+
+Important outputs:
+- `Source-MySQL-IP`: public IP of the EC2 instance hosting the source MariaDB database
+- `RDS-Endpoint-Hostname`: hostname of the target MySQL RDS instance
+- `RDS-MySQL-Username`: `admin`
+- `Source-MySQL-Username`: `root`
+
+Note:
+- The source EC2 host runs MariaDB and is initialized with a `root` password from `var.password`
+- A separate MySQL user named `dms` is also created for the DMS source endpoint
+- The same Terraform variable `password` is used for both the source and target databases unless you override it
+
+## Step 9: Connect to the source EC2 instance
+
+Use the `Source-MySQL-IP` output value:
+
+```bash
+ssh -i ~/.ssh/id_rsa ec2-user@<SOURCE_MYSQL_IP>
+```
+
+## Step 10: Check the AWS DMS Console
+
+After the infrastructure is created, open the AWS DMS console and confirm these resources exist:
+
+- Replication instance: `dms-instance`
+- Source endpoint: `source`
+- Target endpoint: `target`
+- Replication task: `replication-task-dms`
+
+Then check the replication task status. If it does not start automatically, select `replication-task-dms` and resume or restart it from the console.
+
+## Clean up
+
+When you are done, destroy everything:
+
+For IPv4:
+
+```bash
+terraform destroy -var="external_ip=$(curl -s ifconfig.me)/32"
+```
+
+For IPv6:
+
+```bash
+terraform destroy -var="external_ip=$(curl -s ifconfig.me)/128"
+```
+
+With a custom AWS profile:
+
+```bash
+terraform destroy \
+  -var="aws_profile=YOUR_PROFILE_NAME" \
+  -var="external_ip=YOUR_PUBLIC_IP_CIDR"
+```
+
+## Notes
+
+- This module is documented assuming the AWS CLI `default` profile
+- If your local copy uses a different default profile in code, either update `variables.tf` or pass `aws_profile` explicitly at runtime
+- This module deploys resources in `us-east-1`
+- The default SSH public key path is `~/.ssh/id_rsa.pub`
+- The database password is currently provided via a Terraform variable and should be treated as demo-only
+- DMS, RDS, and EC2 resources can take several minutes to become ready

@@ -30,14 +30,20 @@ resource "aws_iam_role_policy_attachment" "dms-cloudwatch-logs-role-AmazonDMSClo
 #The error may still hit, in which case, let it timeout and simply run another terraform apply
 
 resource "aws_iam_role" "dms-vpc-role" {
-  assume_role_policy  = data.aws_iam_policy_document.dms_assume_role.json
-  name                = "dms-vpc-role"
-  managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AmazonDMSVPCManagementRole"]
-  inline_policy {
-    name   = "dms-vpc-role-policy"
-    policy = file("dms_policy.json")
-  }
+  assume_role_policy = data.aws_iam_policy_document.dms_assume_role.json
+  name               = "dms-vpc-role"
   provisioner "local-exec" {
     command = "sleep 80"
   }
+}
+
+resource "aws_iam_role_policy_attachment" "dms-vpc-role-AmazonDMSVPCManagementRole" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonDMSVPCManagementRole"
+  role       = aws_iam_role.dms-vpc-role.name
+}
+
+resource "aws_iam_role_policy" "dms-vpc-role-policy" {
+  name   = "dms-vpc-role-policy"
+  role   = aws_iam_role.dms-vpc-role.id
+  policy = file("dms_policy.json")
 }

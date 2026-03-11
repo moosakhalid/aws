@@ -7,19 +7,24 @@ provider "aws" {
   profile = var.aws_profile
 }
 
-data "template_file" "user_data_ec2" {
-  template = file("./ec2_mysql_bootstrap")
-  vars = {
-    password = var.password
-  }
+locals {
+  external_ip_address = split("/", var.external_ip)[0]
+  external_ip_is_ipv6 = strcontains(local.external_ip_address, ":")
+  # `curl -s ifconfig.me` may return IPv6; appending /32 is common for IPv4 but invalid for a single IPv6 host.
+  normalized_external_ip = local.external_ip_is_ipv6 && endswith(var.external_ip, "/32") ? "${local.external_ip_address}/128" : var.external_ip
+  external_ipv4_cidr     = local.external_ip_is_ipv6 ? null : local.normalized_external_ip
+  external_ipv6_cidr     = local.external_ip_is_ipv6 ? local.normalized_external_ip : null
 }
 
 data "aws_vpc" "default_vpc" {
   default = true
 }
 
-data "aws_subnet_ids" "default_subnet" {
-  vpc_id = data.aws_vpc.default_vpc.id
+data "aws_subnets" "default_subnet" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default_vpc.id]
+  }
 }
 
 data "aws_ssm_parameter" "amazon_linux2_ami" {
@@ -36,11 +41,12 @@ resource "aws_security_group" "security_group_dms" {
   description = "TCP/22"
   vpc_id      = data.aws_vpc.default_vpc.id
   ingress {
-    description = "Allow 22 from our public IP"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.external_ip]
+    description      = "Allow 22 from our public IP"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = local.external_ipv4_cidr == null ? [] : [local.external_ipv4_cidr]
+    ipv6_cidr_blocks = local.external_ipv6_cidr == null ? [] : [local.external_ipv6_cidr]
   }
   ingress {
     description = "allow anyone on port 3306"
@@ -76,21 +82,22 @@ resource "aws_instance" "source_mysql" {
   key_name                    = aws_key_pair.source_mysql_key.key_name
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.security_group_dms.id]
-  subnet_id                   = element(tolist(data.aws_subnet_ids.default_subnet.ids), 0)
-  user_data                   = data.template_file.user_data_ec2.rendered
+  subnet_id                   = element(tolist(data.aws_subnets.default_subnet.ids), 0)
+  user_data = templatefile("${path.module}/ec2_mysql_bootstrap.tftpl", {
+    password = var.password
+  })
 }
 
 #Target RDS Instance
 resource "aws_db_instance" "target_mysql_rds" {
   allocated_storage      = 10
   engine                 = "mysql"
-  engine_version         = "5.7"
+  engine_version         = "8.4"
   instance_class         = "db.t3.micro"
-  name                   = "target_mysql"
+  db_name                = "target_mysql"
   username               = "admin"
   password               = var.password
-  parameter_group_name   = "default.mysql5.7"
+  parameter_group_name   = "default.mysql8.4"
   vpc_security_group_ids = [aws_security_group.security_group_dms.id]
   skip_final_snapshot    = true
 }
-

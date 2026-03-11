@@ -11,11 +11,15 @@ variable "password" {
 }
 
 variable "external_ip" {
-  description = "The IP which we want to allow to access the simulated source MySQL hosted on EC2"
+  description = "The IPv4 or IPv6 CIDR block allowed to SSH to the simulated source MySQL EC2 instance"
   type        = string
   validation {
-    condition     = can(var.external_ip) && can(regex("[^0.0.0.0/0]", var.external_ip))
-    error_message = "External IP should not be 0.0.0.0/0. Please change or set the default external_ip variable in variables.tf to your public IP - or do something like 'terraform plan|apply -var external_ip=$(curl -s ifconfig.me)/32'."
+    condition = (
+      can(cidrhost(var.external_ip, 0)) &&
+      var.external_ip != "0.0.0.0/0" &&
+      var.external_ip != "::/0"
+    )
+    error_message = "external_ip must be a valid IPv4 or IPv6 CIDR block and must not be 0.0.0.0/0 or ::/0. Example: terraform plan -var external_ip=$(curl -s ifconfig.me)/32"
   }
 
 }
