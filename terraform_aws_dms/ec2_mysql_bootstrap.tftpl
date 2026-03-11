@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 yum -y install mariadb-server
 sleep 2
 systemctl start mariadb
@@ -11,16 +13,12 @@ tar -xvzf sakila-db.tar.gz -C /home/ec2-user/
 mysql -uroot -p${password} -e "source /home/ec2-user/sakila-db/sakila-schema.sql;"
 mysql -uroot -p${password} -e "source /home/ec2-user/sakila-db/sakila-data.sql;"
 
-# Amazon Linux 2's default MariaDB client is too old for MySQL 8+ default auth
-# (`caching_sha2_password`). Install the MySQL Community client from Oracle's EL7 repo.
-cat >/etc/yum.repos.d/mysql80-community.repo <<'EOF'
-[mysql80-community]
-name=MySQL 8.0 Community Server
-baseurl=https://repo.mysql.com/yum/mysql-8.0-community/el/7/$basearch/
-enabled=1
-gpgcheck=1
-gpgkey=https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-EOF
+# This instance is the MariaDB source for DMS. Do not install or run Oracle MySQL
+# server here against the same datadir.
+systemctl enable mariadb
+systemctl mask mysqld || true
 
-rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-yum -y install mysql-community-client
+# For ad-hoc verification against the MySQL 8.x RDS target, install a Python
+# connector that supports modern auth without replacing MariaDB RPMs.
+yum -y install python3 python3-pip
+python3 -m pip install --no-cache-dir mysql-connector-python

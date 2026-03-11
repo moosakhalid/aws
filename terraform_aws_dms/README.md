@@ -122,7 +122,7 @@ Important outputs:
 Note:
 - The source EC2 host runs MariaDB and is initialized with a `root` password from `var.password`
 - A separate MySQL user named `dms` is also created for the DMS source endpoint
-- The source EC2 host also installs a MySQL Community client so you can connect from that box to MySQL 8.x RDS instances that use `caching_sha2_password`
+- The source EC2 host also installs Python plus `mysql-connector-python` so you can verify the MySQL 8.x RDS target from that box without replacing MariaDB packages
 - The same Terraform variable `password` is used for both the source and target databases unless you override it
 
 ## Step 9: Connect to the source EC2 instance
@@ -175,10 +175,27 @@ This EC2 instance can connect to the RDS instance on port `3306` because both re
 - [main.tf](/Users/moosakhalid/aws/terraform_aws_dms/main.tf#L105)
 - [main.tf](/Users/moosakhalid/aws/terraform_aws_dms/main.tf#L122)
 
-From the EC2 host, use the installed MySQL Community client to connect to RDS:
+From the EC2 host, use the installed Python connector to verify the RDS target:
 
 ```bash
-mysql -h <RDS_ENDPOINT_HOSTNAME> -u admin -p
+python3 - <<'PY'
+import mysql.connector
+
+conn = mysql.connector.connect(
+    host="<RDS_ENDPOINT_HOSTNAME>",
+    user="admin",
+    password="<PASSWORD>",
+    database="sakila",
+)
+
+cur = conn.cursor()
+cur.execute("SHOW TABLES")
+print("tables:", len(cur.fetchall()))
+cur.execute("SELECT COUNT(*) FROM actor")
+print("actor_count:", cur.fetchone()[0])
+cur.close()
+conn.close()
+PY
 ```
 
 You can get the hostname from:
